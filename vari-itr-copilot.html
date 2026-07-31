@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vari — ITR Copilot · AY 2026-27</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+<style>
+:root{
+  --ink:#1B3A2F; --ink-soft:#3D5A4E; --paper:#EFF3EE; --card:#FFFFFF; --line:#C9D6CD;
+  --stamp:#6F2754; --stamp-soft:#F3E6EE;
+  --marigold:#B97316; --marigold-bg:#FBF1E1;
+  --good:#1E6B4F; --good-bg:#E4F1EA; --danger:#A33B2E; --danger-bg:#F8E9E6;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --body:'Public Sans',system-ui,sans-serif;
+  --display:'Zilla Slab',Georgia,serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 31px,rgba(27,58,47,.045) 31px,rgba(27,58,47,.045) 32px)}
+.wrap{max-width:980px;margin:0 auto;padding:0 20px 80px}
+
+/* ---------- header / hero ---------- */
+header{position:relative;padding:44px 0 30px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;min-height:170px}
+#bg3d{position:absolute;inset:-20px -40px 0;z-index:-1;pointer-events:none;opacity:.9}
+#bg3d canvas{display:block;width:100%;height:100%}
+.brand h1{font-family:var(--display);font-weight:700;font-size:clamp(2rem,5vw,2.7rem);letter-spacing:-.01em;line-height:1}
+.brand h1 .ta{color:var(--stamp)}
+.brand p{margin-top:6px;color:var(--ink-soft);font-size:.95rem;min-height:1.5em}
+.ay-badge{font-family:var(--mono);font-size:.78rem;font-weight:600;border:1.5px solid var(--ink);padding:6px 12px;letter-spacing:.06em;background:var(--card);cursor:pointer;user-select:none}
+.ay-badge span{color:var(--stamp)}
+.proverb{width:100%;font-size:.82rem;font-style:italic;color:var(--ink-soft);border-left:3px solid var(--stamp);padding-left:10px;display:none}
+.proverb.show{display:block}
+
+/* ---------- tabs ---------- */
+nav{position:sticky;top:0;z-index:40;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav button{appearance:none;border:none;background:none;font-family:var(--body);font-weight:600;font-size:.9rem;
+  color:var(--ink-soft);padding:13px 16px 11px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;margin-bottom:-2px}
+nav button:hover{color:var(--ink)}
+nav button[aria-selected="true"]{color:var(--stamp);border-bottom-color:var(--stamp)}
+nav button:focus-visible{outline:2px solid var(--stamp);outline-offset:-2px}
+section[role="tabpanel"]{display:none;padding-top:28px}
+section[role="tabpanel"].active{display:block}
+
+h2{font-family:var(--display);font-weight:600;font-size:1.5rem;margin-bottom:4px}
+.sub{color:var(--ink-soft);font-size:.93rem;margin-bottom:22px;max-width:64ch}
+.card{background:var(--card);border:1.5px solid var(--line);padding:22px}
+.mono{font-family:var(--mono)}
+.callout{border-left:4px solid var(--marigold);background:var(--marigold-bg);padding:12px 16px;font-size:.9rem;margin:14px 0}
+.callout.red{border-left-color:var(--danger);background:var(--danger-bg)}
+.callout.green{border-left-color:var(--good);background:var(--good-bg)}
+.callout b{font-weight:700}
+
+/* 3D tilt surface */
+.tilt{transform-style:preserve-3d;transition:transform .18s ease-out;will-change:transform}
+
+/* ---------- calculator ---------- */
+.calc-grid{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:22px;align-items:start}
+@media(max-width:820px){.calc-grid{grid-template-columns:1fr}}
+fieldset{border:none;margin-bottom:18px}
+legend{font-family:var(--display);font-weight:600;font-size:1.02rem;margin-bottom:10px;
+  border-top:1.5px solid var(--line);width:100%;padding-top:12px}
+fieldset:first-of-type legend{border-top:none;padding-top:0}
+.field{margin-bottom:12px}
+.field label{display:flex;justify-content:space-between;align-items:baseline;font-size:.86rem;font-weight:600;margin-bottom:4px;gap:8px}
+.field label small{font-weight:400;color:var(--ink-soft);font-size:.76rem;text-align:right}
+.field input[type=number]{width:100%;font-family:var(--mono);font-size:1rem;padding:9px 11px;border:1.5px solid var(--line);
+  background:#FDFDFB;color:var(--ink)}
+.field input[type=number]:focus{outline:2px solid var(--stamp);outline-offset:-1px;border-color:var(--stamp)}
+.switch{display:flex;align-items:center;gap:9px;font-size:.86rem;font-weight:600;cursor:pointer;user-select:none}
+.switch input{width:18px;height:18px;accent-color:var(--stamp);cursor:pointer}
+.hint{font-size:.76rem;color:var(--ink-soft);margin-top:3px}
+
+/* verdict stamp — the signature */
+.verdict-zone{min-height:130px;display:flex;align-items:center;justify-content:center;padding:10px 0 4px;perspective:700px}
+.stamp{--rot:-3deg;position:relative;transform:rotate(var(--rot));border:3.5px solid var(--stamp);color:var(--stamp);
+  padding:14px 26px;text-align:center;background:radial-gradient(ellipse at 30% 20%,rgba(111,39,84,.06),transparent 60%);
+  box-shadow:inset 0 0 0 1.5px var(--stamp);max-width:100%}
+.stamp::before,.stamp::after{content:"★";position:absolute;top:50%;transform:translateY(-50%);font-size:.8rem}
+.stamp::before{left:8px}.stamp::after{right:8px}
+.stamp .verdict-line1{font-family:var(--mono);font-weight:600;font-size:.72rem;letter-spacing:.22em;text-transform:uppercase}
+.stamp .verdict-line2{font-family:var(--display);font-weight:700;font-size:clamp(1.2rem,3.4vw,1.7rem);letter-spacing:.02em;line-height:1.15}
+.stamp .verdict-line3{font-size:.8rem;font-family:var(--body);font-weight:500;margin-top:3px;letter-spacing:0;text-transform:none}
+.stamp .ink-ring{position:absolute;inset:-6px;border:2px solid var(--stamp);opacity:0;pointer-events:none}
+.stamp.slam{animation:slamIn .5s cubic-bezier(.3,1.4,.4,1)}
+@keyframes slamIn{
+  0%{transform:rotate(var(--rot)) scale(2.1) translateZ(220px) rotateX(38deg);opacity:0;filter:blur(2px)}
+  55%{opacity:1;filter:blur(0)}
+  70%{transform:rotate(var(--rot)) scale(.96)}
+  100%{transform:rotate(var(--rot)) scale(1)}}
+.stamp.slam .ink-ring{animation:inkRipple .55s .18s ease-out}
+@keyframes inkRipple{0%{opacity:.5;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+body.thud{animation:pageThud .28s .16s}
+@keyframes pageThud{0%,100%{transform:translateY(0)}35%{transform:translateY(3px)}70%{transform:translateY(-1px)}}
+.stamp.tie{--rot:0deg;border-color:var(--ink-soft);color:var(--ink-soft);box-shadow:inset 0 0 0 1.5px var(--ink-soft)}
+@media(prefers-reduced-motion:reduce){
+  .stamp.slam,.stamp.slam .ink-ring,body.thud{animation:none}
+  .tilt{transition:none;transform:none!important}
+  #bg3d{display:none}
+}
+
+/* results table */
+table.compare{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:16px}
+table.compare th,table.compare td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:right}
+table.compare th:first-child,table.compare td:first-child{text-align:left;font-weight:500}
+table.compare thead th{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);border-bottom:2px solid var(--ink)}
+table.compare td{font-family:var(--mono)}
+table.compare tr.total td{font-weight:600;border-top:2px solid var(--ink);border-bottom:none;font-size:.98rem;padding-top:10px}
+td.winner{color:var(--good);font-weight:600}
+td.rolling{color:var(--stamp)}
+.breakeven{margin-top:14px;font-size:.88rem;background:var(--stamp-soft);border:1.5px dashed var(--stamp);padding:12px 15px}
+.breakeven b{font-family:var(--mono)}
+.tds-line{margin-top:14px;font-size:.9rem;background:var(--paper);border:1.5px solid var(--ink);padding:12px 15px}
+.tds-line b{font-family:var(--mono)}
+
+/* regime summary cards (side-by-side breakdown) */
+.regime-cards{display:grid;gap:14px;margin-top:16px}
+.regime-card{border:1.5px solid var(--line);background:#FDFDFB}
+.regime-card .rc-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1.5px solid var(--line)}
+.regime-card .rc-head h3{font-family:var(--display);font-weight:600;font-size:1.02rem}
+.regime-card .rc-head .fy{font-family:var(--mono);font-size:.7rem;color:var(--ink-soft);letter-spacing:.05em}
+.regime-card .rc-rows{padding:10px 16px}
+.regime-card .rc-row{display:flex;justify-content:space-between;gap:12px;font-size:.86rem;padding:5px 0;color:var(--ink-soft)}
+.regime-card .rc-row span:last-child{font-family:var(--mono);color:var(--ink)}
+.regime-card .takehome{margin:6px 12px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:11px 14px;border:1.5px solid var(--line);background:var(--card);font-weight:600;font-size:.92rem}
+.regime-card .takehome span:last-child{font-family:var(--mono);font-size:1.15rem}
+.regime-card.winner-card{border-color:var(--good)}
+.regime-card.winner-card .takehome{background:var(--good-bg);border-color:var(--good)}
+.regime-card.winner-card .takehome span:last-child{color:var(--good)}
+details.fulltable{margin-top:14px;border:1.5px solid var(--line);background:var(--card)}
+details.fulltable summary{padding:11px 16px;font-weight:600;font-size:.88rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+details.fulltable summary::-webkit-details-marker{display:none}
+details.fulltable summary::after{content:"+";font-family:var(--mono);color:var(--ink-soft)}
+details.fulltable[open] summary::after{content:"–"}
+details.fulltable .inner{padding:0 16px 16px}
+
+/* HRA helper */
+.hra-steps{font-size:.8rem;color:var(--ink-soft);background:var(--paper);border:1px solid var(--line);padding:10px 12px;margin-bottom:12px}
+.hra-steps b{color:var(--ink)}
+.hra-result{font-size:.83rem;background:var(--stamp-soft);border:1.5px dashed var(--stamp);padding:10px 12px;margin-top:10px}
+.hra-result b{font-family:var(--mono)}
+.hra-result .why{color:var(--ink-soft);font-size:.76rem;margin-top:4px}
+
+/* checklist "where" line */
+.check-item .w{display:block;font-size:.78rem;color:var(--stamp);margin-top:3px}
+.check-item .w code{font-family:var(--mono);font-size:.74rem;background:var(--paper);padding:0 5px;border:1px solid var(--line)}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:90}
+
+/* ---------- guide ---------- */
+.steps{counter-reset:step}
+details.step{background:var(--card);border:1.5px solid var(--line);margin-bottom:10px}
+details.step summary{display:flex;gap:14px;align-items:baseline;padding:15px 18px;cursor:pointer;font-weight:600;list-style:none}
+details.step summary::-webkit-details-marker{display:none}
+details.step summary::before{counter-increment:step;content:counter(step,decimal-leading-zero);
+  font-family:var(--mono);font-weight:600;color:var(--stamp);font-size:.85rem;min-width:26px}
+details.step summary::after{content:"+";margin-left:auto;font-family:var(--mono);color:var(--ink-soft);font-size:1.1rem}
+details.step[open] summary::after{content:"–"}
+details.step .body{padding:0 18px 16px 58px;font-size:.92rem}
+details.step .body p{margin-bottom:8px}
+details.step .body code{font-family:var(--mono);font-size:.84rem;background:var(--paper);padding:1px 6px;border:1px solid var(--line)}
+details.step .body .aside{font-size:.8rem;color:var(--ink-soft);font-style:italic}
+@media(max-width:560px){details.step .body{padding-left:18px}}
+
+/* ---------- checklist ---------- */
+.check-list{display:grid;gap:8px}
+.check-item{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1.5px solid var(--line);padding:13px 16px;cursor:pointer}
+.check-item input{width:19px;height:19px;margin-top:2px;accent-color:var(--good);flex:none;cursor:pointer}
+.check-item input:checked{animation:tickPop .3s cubic-bezier(.3,1.6,.5,1)}
+@keyframes tickPop{0%{transform:scale(.6)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
+@media(prefers-reduced-motion:reduce){.check-item input:checked{animation:none}}
+.check-item .t{font-weight:600;font-size:.92rem}
+.check-item .d{font-size:.8rem;color:var(--ink-soft)}
+.check-item.done{background:var(--good-bg);border-color:var(--good)}
+.check-item.done .t{text-decoration:line-through;text-decoration-thickness:1.5px}
+.progress{font-family:var(--mono);font-size:.82rem;margin-bottom:14px;color:var(--ink-soft)}
+.progress b{color:var(--good)}
+
+/* ---------- quiz ---------- */
+.quiz-q{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--card);
+  border:1.5px solid var(--line);padding:13px 16px;margin-bottom:8px;font-size:.92rem}
+.quiz-q .q{font-weight:500;max-width:60ch}
+.toggle{display:flex;border:1.5px solid var(--ink);flex:none}
+.toggle button{appearance:none;border:none;background:var(--card);font-family:var(--mono);font-size:.78rem;font-weight:600;
+  padding:6px 14px;cursor:pointer;color:var(--ink-soft)}
+.toggle button+button{border-left:1.5px solid var(--ink)}
+.toggle button.on{background:var(--ink);color:#fff}
+.toggle button.on.yes{background:var(--danger)}
+.quiz-verdict{margin-top:18px;padding:18px 20px;border:2.5px solid var(--good);background:var(--good-bg);font-size:1rem}
+.quiz-verdict.itr2{border-color:var(--marigold);background:var(--marigold-bg)}
+.quiz-verdict b{font-family:var(--display);font-size:1.25rem}
+
+/* ---------- cheat sheet ---------- */
+table.cheat{width:100%;border-collapse:collapse;font-size:.88rem;background:var(--card)}
+table.cheat th,table.cheat td{padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top}
+table.cheat thead th{font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;background:var(--paper)}
+.pill{display:inline-block;font-family:var(--mono);font-size:.7rem;font-weight:600;padding:2px 8px;letter-spacing:.04em}
+.pill.ex{background:var(--good-bg);color:var(--good);border:1px solid var(--good)}
+.pill.tax{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger)}
+.pill.part{background:var(--marigold-bg);color:var(--marigold);border:1px solid var(--marigold)}
+
+footer{margin-top:46px;border-top:2px solid var(--ink);padding-top:14px;font-size:.78rem;color:var(--ink-soft)}
+footer b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div id="bg3d" aria-hidden="true"></div>
+  <div class="brand">
+    <h1>Vari<span class="ta"> · வரி</span></h1>
+    <p id="tagline">Taxes are certain. Confusion is optional.</p>
+  </div>
+  <div class="ay-badge" id="ayBadge" title="Click for ancient tax wisdom">AY <span>2026-27</span> · FY 2025-26 · SALARIED</div>
+  <div class="proverb" id="proverb"></div>
+</header>
+
+<nav role="tablist" aria-label="Sections">
+  <button role="tab" aria-selected="true" data-tab="calc">The great regime debate</button>
+  <button role="tab" aria-selected="false" data-tab="guide">Portal survival guide</button>
+  <button role="tab" aria-selected="false" data-tab="docs">The paper chase</button>
+  <button role="tab" aria-selected="false" data-tab="quiz">Which form am I?</button>
+  <button role="tab" aria-selected="false" data-tab="cheat">Exempt or not</button>
+</nav>
+
+<!-- ============ CALCULATOR ============ -->
+<section role="tabpanel" id="tab-calc" class="active">
+  <h2>Old vs new regime</h2>
+  <p class="sub">The annual national debate, settled with arithmetic instead of WhatsApp forwards. Everything computes in your browser — nothing leaves this page.</p>
+
+  <div class="calc-grid">
+    <form class="card" id="calcForm" autocomplete="off">
+      <fieldset>
+        <legend>What came in</legend>
+        <div class="field">
+          <label for="salary">Annual gross salary <small>Form 16 item 1(d) — the number before HR "optimised" it</small></label>
+          <input type="number" id="salary" min="0" step="1000" placeholder="e.g. 15,00,000">
+        </div>
+        <div class="field">
+          <label for="salaryM">Monthly gross salary <small>or enter this — the two stay in sync</small></label>
+          <input type="number" id="salaryM" min="0" step="500" placeholder="e.g. 1,25,000">
+        </div>
+        <div class="field">
+          <label for="other">Other income <small>interest &amp; dividends your AIS remembers even if you don't</small></label>
+          <input type="number" id="other" min="0" step="100" placeholder="e.g. 13358">
+        </div>
+        <div class="field">
+          <label for="savint">…of which savings-account interest <small>for 80TTA (old regime's small mercy)</small></label>
+          <input type="number" id="savint" min="0" step="100" placeholder="e.g. 1949">
+        </div>
+        <div class="field">
+          <label for="tds">TDS already deducted <small>Form 16 total — what already left before you saw it</small></label>
+          <input type="number" id="tds" min="0" step="100" placeholder="e.g. 389100">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>What the old regime respects</legend>
+        <div class="field">
+          <label for="c80">80C total <small>EPF · PPF · SSY · ELSS · the policy LIC-uncle sold at your wedding — cap ₹1.5L</small></label>
+          <input type="number" id="c80" min="0" step="1000" placeholder="e.g. 150000">
+        </div>
+        <div class="field">
+          <label for="homeint">Home-loan interest, self-occupied <small>Sec 24(b), cap ₹2L — EMI pain, partially rewarded</small></label>
+          <input type="number" id="homeint" min="0" step="1000" placeholder="e.g. 101381">
+        </div>
+        <div class="field">
+          <label for="d80">80D health insurance <small>₹25k self + up to ₹50k for parents who "never need doctors"</small></label>
+          <input type="number" id="d80" min="0" step="500" placeholder="e.g. 20000">
+        </div>
+        <div class="field">
+          <label for="nps">NPS 80CCD(1B) <small>cap ₹50k — retirement planning, but make it tax-flavoured</small></label>
+          <input type="number" id="nps" min="0" step="1000" placeholder="0">
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>HRA — only if you ACTUALLY pay rent</legend>
+        <div class="hra-steps">
+          <b>Three steps, all from one payslip:</b><br>
+          1️⃣ Open any month's payslip. Find the row called <b>"Basic"</b> — type that monthly number below.<br>
+          2️⃣ Find the row called <b>"HRA"</b> or "House Rent Allowance" — type that monthly number. No such row? Your salary has no HRA component and this whole section does nothing — skip it.<br>
+          3️⃣ Type your real monthly rent. That's it — we annualise and apply the least-of-three rule for you, and explain the result below.
+        </div>
+        <div class="field">
+          <label for="basicM">Basic — monthly, from payslip</label>
+          <input type="number" id="basicM" min="0" step="500" placeholder="e.g. 90000">
+        </div>
+        <div class="field">
+          <label for="hrarecM">HRA — monthly, from payslip</label>
+          <input type="number" id="hrarecM" min="0" step="500" placeholder="e.g. 36000">
+        </div>
+        <div class="field">
+          <label for="rent">Rent you pay — monthly</label>
+          <input type="number" id="rent" min="0" step="500" placeholder="e.g. 22000">
+          <div class="hint">Annual rent above ₹1,00,000 needs your landlord's PAN — yes, the uncle who takes cash only.</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="metro" checked> I live in a metro (Chennai · Mumbai · Delhi · Kolkata)</label>
+        <div class="hra-result" id="hraResult" hidden></div>
+      </fieldset>
+      <div class="callout red" style="margin-bottom:0">
+        <b>Only claim what's real.</b> The department cross-matches landlord PANs and bank transfers, and "creative" HRA
+        carries penalties up to 200% of tax evaded. This calculator will show you honestly that you probably don't
+        need the drama anyway.
+      </div>
+    </form>
+
+    <div>
+      <div class="card tilt" id="resultsCard">
+        <div class="verdict-zone" id="verdictZone" aria-live="polite">
+          <div class="stamp tie" id="stamp">
+            <span class="ink-ring" aria-hidden="true"></span>
+            <div class="verdict-line1">Court is in session</div>
+            <div class="verdict-line2">Enter your salary to begin</div>
+            <div class="verdict-line3">The stamp is warming up.</div>
+          </div>
+        </div>
+
+        <div class="regime-cards" id="regimeCards" hidden>
+          <div class="regime-card" id="cardNew">
+            <div class="rc-head"><h3>New Tax Regime</h3><span class="fy">FY 2025-26</span></div>
+            <div class="rc-rows">
+              <div class="rc-row"><span>Standard deduction</span><span>₹75,000</span></div>
+              <div class="rc-row"><span>Taxable income</span><span id="rcNTaxable">—</span></div>
+              <div class="rc-row"><span>Total tax payable</span><span id="rcNTax">—</span></div>
+            </div>
+            <div class="takehome"><span>Monthly take-home (net)</span><span id="rcNTake">₹0</span></div>
+          </div>
+          <div class="regime-card" id="cardOld">
+            <div class="rc-head"><h3>Old Tax Regime</h3><span class="fy">FY 2025-26</span></div>
+            <div class="rc-rows">
+              <div class="rc-row"><span>Standard deduction</span><span>₹50,000</span></div>
+              <div class="rc-row"><span>HRA + deductions applied</span><span id="rcODed">—</span></div>
+              <div class="rc-row"><span>Taxable income</span><span id="rcOTaxable">—</span></div>
+              <div class="rc-row"><span>Total tax payable</span><span id="rcOTax">—</span></div>
+            </div>
+            <div class="takehome"><span>Monthly take-home (net)</span><span id="rcOTake">₹0</span></div>
+          </div>
+        </div>
+        <div class="hint" id="takeNote" hidden>Take-home = (annual salary − full-year tax) ÷ 12. EPF, professional tax and other payroll deductions aren't modelled — your payslip's net will be a bit lower.</div>
+
+        <details class="fulltable" id="fullTableWrap" hidden>
+          <summary>Full slab-by-slab breakdown, for the curious</summary>
+          <div class="inner">
+        <table class="compare" id="cmpTable">
+          <thead><tr><th></th><th>Old regime</th><th>New regime</th></tr></thead>
+          <tbody>
+            <tr><td>Gross income</td><td id="oGross"></td><td id="nGross"></td></tr>
+            <tr><td>Standard deduction</td><td id="oStd"></td><td id="nStd"></td></tr>
+            <tr><td>HRA exemption</td><td id="oHra"></td><td>—</td></tr>
+            <tr><td>Chapter VI-A + 24(b)</td><td id="oDed"></td><td>—</td></tr>
+            <tr><td>Taxable income</td><td id="oTaxable"></td><td id="nTaxable"></td></tr>
+            <tr><td>Tax on income</td><td id="oTax"></td><td id="nTax"></td></tr>
+            <tr><td>Surcharge</td><td id="oSur"></td><td id="nSur"></td></tr>
+            <tr><td>Health &amp; education cess 4%</td><td id="oCess"></td><td id="nCess"></td></tr>
+            <tr class="total"><td>Total tax</td><td id="oTotal"></td><td id="nTotal"></td></tr>
+          </tbody>
+        </table>
+          </div>
+        </details>
+        <div class="breakeven" id="breakeven" hidden></div>
+        <div class="tds-line" id="tdsLine" hidden></div>
+        <div class="callout" id="surNote" hidden>
+          Income above ₹50L attracts surcharge (congratulations, by the way); marginal relief is approximated —
+          verify the final figure on the portal.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GUIDE ============ -->
+<section role="tabpanel" id="tab-guide">
+  <h2>Portal survival guide</h2>
+  <p class="sub">The exact clicks on <span class="mono">incometax.gov.in</span>, including the screens designed by someone who was clearly having a bad day. Field-tested by an actual confused human.</p>
+
+  <div class="steps">
+    <details class="step" open>
+      <summary>Before you log in</summary>
+      <div class="body">
+        <p>Keep ready: Form 16, AIS, 26AS, and your Aadhaar-linked mobile for the final OTP.
+        Confirm at least one bank account is <b>pre-validated</b> (Profile → My bank accounts) — mandatory even with no refund.</p>
+        <p class="aside">Also keep: coffee, patience, and mild optimism.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Start the return: ITR-1, online mode</summary>
+      <div class="body">
+        <p>e-File → Income Tax Returns → File Income Tax Return → <code>AY 2026-27</code> → Online → Individual → <code>ITR-1</code>.</p>
+        <p>Unsure about ITR-1? The <b>Which form am I?</b> tab knows.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>"Reason for filing" — pick the boring first option</summary>
+      <div class="body">
+        <p>Choose <b>"Taxable income is more than basic exemption limit."</b></p>
+        <p>The exciting-looking second option (Seventh Proviso — ₹1&nbsp;crore deposits, ₹2L foreign travel…) is for people
+        <em>below</em> the taxable limit who must still file. If a salary hits your account every month, that's not your movie.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Your whole name is sitting in "Last Name" — leave it alone</summary>
+      <div class="body">
+        <p>PAN insists on a surname; single names get parked there. Half of Tamil Nadu is in this club.
+        Everything matches on PAN, not name order. <b>Do not</b> start a PAN correction nine days before the deadline.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Nature of employment → "Others"</summary>
+      <div class="body">
+        <p>Private-sector employees pick <b>Others</b>. Yes — you spent years building a career and the government
+        filed you under "Others". It has zero tax impact. Breathe.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>The regime question — a double negative, because of course</summary>
+      <div class="body">
+        <p>"Do you wish to exercise the option u/s 115BAC(6) of <b>opting out</b> of new tax regime?"</p>
+        <p><code>No</code> = stay in the <b>new</b> regime. <code>Yes</code> = go <b>old</b>. Read it twice, answer once.
+        Get your answer from the stamp in the first tab.</p>
+        <p>Salaried folks can re-choose every year — but only if the return is filed by the due date.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Verify pre-filled salary and TDS</summary>
+      <div class="body">
+        <p>Gross salary should match Form 16 item 1(d); Schedule TDS1 should match the Form 16 total and 26AS
+        (all rows with booking status <code>F</code>). Don't "fix" a mismatch by editing — a mismatch means a document is stale.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Add "Income from Other Sources" from your AIS</summary>
+      <div class="body">
+        <p>Savings + FD/RD interest + dividends. RD interest is <b>fully taxable</b> in both regimes — the RD doesn't
+        care about your feelings. If the portal pre-fills less than AIS shows, add the difference.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Exempt income (Schedule EI) — the free stuff</summary>
+      <div class="body">
+        <p>Disclose here, tax-free: SSY interest (10(11A)), PPF interest (10(11)), post-office savings interest up to
+        ₹3,500 (10(15)(i) — works even in the new regime). Ten seconds of honesty, zero rupees of tax.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Pay the balance — and the famous challan disappearing act</summary>
+      <div class="body">
+        <p>If tax &gt; TDS: <b>e-Pay Tax</b> → Self-Assessment Tax (300) → AY 2026-27.</p>
+        <p><b>The trap:</b> your freshly paid challan often refuses to appear in the return for 30 min–24 hrs.
+        It's not lost — it's just being processed at government speed. <b>Never pay twice.</b>
+        Check e-Pay Tax → <b>Payment History</b>; if paid, enter the challan manually in Tax Paid:
+        BSR code, date, serial number, amount. CPC matches it later.</p>
+      </div>
+    </details>
+    <details class="step">
+      <summary>Submit, then e-verify IMMEDIATELY</summary>
+      <div class="body">
+        <p>An unverified return is legally a return that never happened — Schrödinger's ITR.
+        Aadhaar OTP, same sitting, then download the ITR-V. Now go tell your family group you filed before them.</p>
+      </div>
+    </details>
+  </div>
+
+  <div class="callout green"><b>Deadline for salaried, AY 2026-27: 31 July 2026.</b> Belated filing works till 31 December
+  with a late fee up to ₹5,000 — and you lose the old-regime option for the year. The portal also mysteriously slows to
+  bullock-cart speed on July 30–31. File early.</div>
+</section>
+
+<!-- ============ DOCUMENTS ============ -->
+<section role="tabpanel" id="tab-docs">
+  <h2>The paper chase</h2>
+  <p class="sub">Tick things off as you find them. Progress lives only on this page — refresh and it forgets, like your bank forgets to send interest certificates.</p>
+  <div class="progress" id="progress">0 of 9 hunted down</div>
+  <div class="check-list" id="checkList">
+    <label class="check-item"><input type="checkbox"><span><span class="t">Form 16 (Part A + Part B)</span><br><span class="d">Usually released by mid-June — after exactly one reminder email to HR.</span><span class="w">Where: your company's payroll/HR portal (Workday, greytHR, ADP, Darwinbox…) → Tax / Form 16 section. If missing, mail payroll — they must issue it by June 15.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">Form 26AS</span><br><span class="d">Every TDS row should say F — F for Final, not for your reaction.</span><span class="w">Where: <code>incometax.gov.in</code> → log in → e-File → Income Tax Returns → <b>View Form 26AS</b> → confirm → redirected to TRACES → View Tax Credit → pick AY 2026-27 → export PDF.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">AIS / TIS</span><br><span class="d">The document that remembers the ₹60 dividend you forgot you owned shares for.</span><span class="w">Where: <code>incometax.gov.in</code> → log in → top menu <b>AIS</b> → Proceed → choose FY 2025-26 → download PDF. PDF password: PAN in lowercase + DOB as DDMMYYYY.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">Bank interest certificates</span><br><span class="d">Banks and AIS occasionally disagree, like relatives — cross-check.</span><span class="w">Where: netbanking → Deposits/Accounts → <b>Interest Certificate</b> (HDFC: Enquire → Interest Certificate; SBI: e-Services → Interest Certificate; ICICI: Statements). Pick FY 2025-26.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">Home-loan statement</span><br><span class="d">The annual reminder of how much the bank actually owns.</span><span class="w">Where: lender's portal/app → Loan account → <b>Interest / Provisional Certificate</b> for FY 2025-26 — shows the principal (80C) and interest (24b) split.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">80C proofs</span><br><span class="d">EPF payslip, PPF/SSY passbook, ELSS statement, and that LIC receipt from the shoebox.</span><span class="w">Where: EPF → <code>passbook.epfindia.gov.in</code> (UAN login) · PPF/SSY → bank netbanking or updated post-office passbook · ELSS → fund house / MF platform statement · LIC → <code>licindia.in</code> premium paid certificate.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">Health-insurance receipts (80D)</span><br><span class="d">New-regime folks: the insurance still works, just not on taxes.</span><span class="w">Where: insurer's portal/app → Policy documents → <b>Premium / 80D certificate</b> for FY 2025-26.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">Rent receipts + landlord PAN</span><br><span class="d">Only if genuinely claiming HRA. Negotiate bravely.</span><span class="w">Where: from your landlord — monthly receipts (revenue stamp for cash above ₹5,000) and their PAN in writing if annual rent exceeds ₹1L.</span></span></label>
+    <label class="check-item"><input type="checkbox"><span><span class="t">Pre-validated bank account + Aadhaar-linked mobile</span><br><span class="d">The last boss of the filing game.</span><span class="w">Where: <code>incometax.gov.in</code> → My Profile → <b>My Bank Account</b> → Add/Revalidate (needs blue tick). Aadhaar-mobile link: check at <code>uidai.gov.in</code> → Verify Aadhaar.</span></span></label>
+  </div>
+</section>
+
+<!-- ============ QUIZ ============ -->
+<section role="tabpanel" id="tab-quiz">
+  <h2>Which form am I?</h2>
+  <p class="sub">Answer honestly for FY 2025-26 — the department already knows anyway. Any single "Yes" usually promotes you out of ITR-1.</p>
+  <div id="quizList"></div>
+  <div class="quiz-verdict" id="quizVerdict"><b>ITR-1 (Sahaj)</b> — "Sahaj" literally means easy, and for once the naming is accurate. File it online with pre-filled data.</div>
+  <div class="callout"><b>MNC employees, one sec:</b> RSUs/ESPP of a foreign parent (held on a foreign exchange) are
+  foreign assets → ITR-2 with Schedule FA is mandatory, and skipping it invites penalties with many zeros. Business or
+  freelance income moves you to ITR-3/ITR-4 — different quiz, different life.</div>
+</section>
+
+<!-- ============ CHEAT SHEET ============ -->
+<section role="tabpanel" id="tab-cheat">
+  <h2>Exempt or not</h2>
+  <p class="sub">The items that confuse every salaried filer, settled once. "Both" = same treatment in old and new regimes.</p>
+  <div style="overflow-x:auto">
+  <table class="cheat">
+    <thead><tr><th>Item</th><th>Treatment</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>SSY interest &amp; maturity</td><td><span class="pill ex">Exempt · both</span></td><td>Sec 10(11A). Disclose in Schedule EI. Daughter's account, national treasure.</td></tr>
+      <tr><td>PPF interest &amp; maturity</td><td><span class="pill ex">Exempt · both</span></td><td>Sec 10(11). The one thing everyone's father was right about.</td></tr>
+      <tr><td>Post-office savings interest</td><td><span class="pill part">Exempt to ₹3,500</span></td><td>Sec 10(15)(i); ₹7,000 joint. Works even in new regime. POSB only — IPPB is fully taxable.</td></tr>
+      <tr><td>Savings-account interest (bank)</td><td><span class="pill tax">Taxable</span></td><td>Old regime: 80TTA deducts up to ₹10,000. New regime: no deduction, no discussion.</td></tr>
+      <tr><td>FD / RD interest</td><td><span class="pill tax">Taxable · both</span></td><td>Fully taxable at slab. The RD gives you discipline and a tax bill.</td></tr>
+      <tr><td>Dividends (any amount)</td><td><span class="pill tax">Taxable · both</span></td><td>Even ₹60. Slab rate. Fine in ITR-1 — it's <em>selling</em> shares that forces ITR-2.</td></tr>
+      <tr><td>EPF interest</td><td><span class="pill part">Mostly exempt</span></td><td>Taxable only on employee contributions above ₹2.5L/yr.</td></tr>
+      <tr><td>Home-loan interest, self-occupied</td><td><span class="pill part">Old only</span></td><td>Sec 24(b) up to ₹2L in old regime; the new regime sends thoughts and prayers.</td></tr>
+      <tr><td>HRA exemption</td><td><span class="pill part">Old only</span></td><td>Least of: HRA received · rent − 10% basic · 50% basic (metro). Zero if rent ≤ 10% of basic — yes, really.</td></tr>
+      <tr><td>Standard deduction</td><td><span class="pill ex">Both</span></td><td>₹75,000 new · ₹50,000 old. Automatic, no proof — the tax system's one act of kindness.</td></tr>
+      <tr><td>Gifts from relatives</td><td><span class="pill ex">Exempt · both</span></td><td>Non-relatives: taxable past ₹50,000/yr. Define "relative" carefully at weddings.</td></tr>
+      <tr><td>LTCG on listed equity/MF</td><td><span class="pill part">₹1.25L free</span></td><td>Sec 112A: 12.5% beyond ₹1.25L. Small 112A gains fit ITR-1; STCG does not.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<footer>
+  <b>Vari</b> is an educational companion for AY 2026-27 (FY 2025-26) only — not tax advice, and it never files on your
+  behalf (that heroism is all yours). Slabs change every Finance Act; verify the final computation on incometax.gov.in,
+  and see a CA for capital gains, foreign assets, or business income. Everything runs locally in your browser; the only
+  thing this page collects is your grudging respect for the new regime.
+</footer>
+</div>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+<script>
+(function(){
+"use strict";
+
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- tabs ---------- */
+const tabs=[...document.querySelectorAll('nav [role=tab]')];
+tabs.forEach(t=>t.addEventListener('click',()=>{
+  tabs.forEach(x=>x.setAttribute('aria-selected',x===t));
+  document.querySelectorAll('[role=tabpanel]').forEach(p=>p.classList.toggle('active',p.id==='tab-'+t.dataset.tab));
+}));
+
+/* ---------- rotating taglines + proverb easter egg ---------- */
+const TAGLINES=[
+ 'Taxes are certain. Confusion is optional.',
+ 'Helping you argue with the regime question since 2026.',
+ 'Because "Others" is a nature of employment now.',
+ 'Your CA charges ₹2,000 for this conversation.',
+ 'Filed early. Flexed quietly.',
+ 'Standard deduction: the government\u2019s way of saying "we tried".'
+];
+let tgi=0;
+setInterval(()=>{if(document.hidden)return;tgi=(tgi+1)%TAGLINES.length;
+  document.getElementById('tagline').textContent=TAGLINES[tgi];},6000);
+
+const PROVERBS=[
+ '"A challan paid twice teaches patience to the whole family." — ancient portal wisdom',
+ '"He who e-verifies immediately sleeps peacefully." — CPC Upanishad',
+ '"The AIS remembers what the heart forgets." — dividend of ₹60',
+ '"On July 31st, even the bravest servers kneel." — portal folklore',
+ '"An unverified return is merely expensive typing." — Section 140 proverb'
+];
+let pvi=-1;
+document.getElementById('ayBadge').addEventListener('click',()=>{
+  pvi=(pvi+1)%PROVERBS.length;
+  const p=document.getElementById('proverb');
+  p.textContent=PROVERBS[pvi];p.classList.add('show');
+});
+
+/* ---------- helpers ---------- */
+const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+const val=id=>Math.max(0,Number(document.getElementById(id).value)||0);
+
+/* ---------- AY 2026-27 slab config (FY 2025-26, Act of 1961) ---------- */
+const NEW_SLABS=[[400000,0],[400000,.05],[400000,.10],[400000,.15],[400000,.20],[400000,.25],[Infinity,.30]];
+const OLD_SLABS=[[250000,0],[250000,.05],[500000,.20],[Infinity,.30]];
+function slabTax(taxable,slabs){
+  let t=0,rem=taxable;
+  for(const [w,r] of slabs){ if(rem<=0)break; const a=Math.min(rem,w); t+=a*r; rem-=a; }
+  return t;
+}
+function surcharge(taxable,tax,isNew){
+  const bands=[[5e6,0],[1e7,.10],[2e7,.15],[5e7,.25],[Infinity,isNew?.25:.37]];
+  let rate=0,prevCap=0;
+  for(const [cap,r] of bands){ if(taxable>prevCap)rate=r; prevCap=cap; if(taxable<=cap)break; }
+  if(rate===0)return 0;
+  let s=tax*rate;
+  if(taxable>5e6){
+    const taxAt=slabTax(5e6,isNew?NEW_SLABS:OLD_SLABS);
+    const excess=taxable-5e6;
+    if(tax+s > taxAt+excess) s=Math.max(0,taxAt+excess-tax);
+  }
+  return s;
+}
+function newRegimeTax(taxable){
+  let tax=slabTax(taxable,NEW_SLABS);
+  if(taxable<=1200000) tax=0;
+  else if(taxable<=1275000) tax=Math.min(tax,taxable-1200000);
+  const s=surcharge(taxable,tax,true);
+  return {tax,sur:s,cess:(tax+s)*.04,total:(tax+s)*1.04};
+}
+function oldRegimeTax(taxable){
+  let tax=slabTax(taxable,OLD_SLABS);
+  if(taxable<=500000) tax=0;
+  const s=surcharge(taxable,tax,false);
+  return {tax,sur:s,cess:(tax+s)*.04,total:(tax+s)*1.04};
+}
+
+/* ---------- count-up roll ---------- */
+const rollState={};
+function rollMoney(id,target){
+  const el=document.getElementById(id);
+  if(reduceMotion){el.textContent=fmt(target);rollState[id]=target;return;}
+  const from=rollState[id]||0;rollState[id]=target;
+  if(rollState[id+'_raf'])cancelAnimationFrame(rollState[id+'_raf']);
+  const t0=performance.now(),dur=550;
+  el.classList.add('rolling');
+  (function tick(now){
+    const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent=fmt(from+(target-from)*e);
+    if(p<1)rollState[id+'_raf']=requestAnimationFrame(tick);
+    else el.classList.remove('rolling');
+  })(t0);
+}
+
+/* ---------- calculator ---------- */
+const form=document.getElementById('calcForm');
+let lastWinner=null;
+let refundCelebrated=false;
+
+const QUIP_NEW=[
+ 'Your CA just lost a client.',
+ 'The LIC uncle will understand. Eventually.',
+ 'Modern problems, modern regime.',
+ 'Answer "No" on the portal. Yes, No. It\u2019s complicated.'
+];
+const QUIP_OLD=[
+ 'Grandfather\u2019s investment advice: vindicated.',
+ 'The deduction shoebox was worth it.',
+ 'Answer "Yes" to opting out — and keep every receipt.'
+];
+const pick=a=>a[Math.random()*a.length|0];
+
+function compute(){
+  const salary=val('salary'),other=val('other');
+  if(!salary&&!other){resetVerdict();return;}
+  const savint=Math.min(val('savint'),other);
+  const c80=Math.min(val('c80'),150000);
+  const homeint=Math.min(val('homeint'),200000);
+  const d80=Math.min(val('d80'),100000);
+  const nps=Math.min(val('nps'),50000);
+  const basic=val('basicM')*12, hrarec=val('hrarecM')*12, rentA=val('rent')*12;
+  const metro=document.getElementById('metro').checked;
+  let hra=0, hraA=hrarec, hraB=rentA-basic*.10, hraC=basic*(metro?.5:.4);
+  if(hrarec>0&&rentA>0&&basic>0){
+    hra=Math.max(0,Math.min(hraA,hraB,hraC));
+  }
+  /* live HRA explainer */
+  const hr=document.getElementById('hraResult');
+  if(basic>0||hrarec>0||rentA>0){
+    if(!(basic>0&&hrarec>0&&rentA>0)){
+      hr.innerHTML='Fill all three fields above to see your HRA exemption.';
+    } else if(hra<=0){
+      hr.innerHTML='Your HRA exemption: <b>₹0</b><div class="why">Because your annual rent ('+fmt(rentA)+') is not more than 10% of your basic ('+fmt(basic*.10)+'). The rule only rewards rent <em>above</em> that line — common at higher salaries, and exactly why many Form 16s show HRA as 0.</div>';
+    } else {
+      const which= hra===Math.min(hraA,hraB,hraC)&&hra===hraA?'the HRA you actually receive':(hra===hraB?'your rent minus 10% of basic':'50/40% of your basic');
+      hr.innerHTML='Your HRA exemption: <b>'+fmt(hra)+'</b> per year<div class="why">Least of three: HRA received '+fmt(hraA)+' · rent − 10% basic '+fmt(Math.max(0,hraB))+' · '+(metro?'50%':'40%')+' of basic '+fmt(hraC)+'. Your limit is '+which+'.</div>';
+    }
+    hr.hidden=false;
+  } else hr.hidden=true;
+
+  const tta=Math.min(savint,10000);
+  const nTaxable=Math.max(0,salary-75000+other);
+  const ded=c80+homeint+d80+nps+tta;
+  const oTaxable=Math.max(0,salary-50000-hra-ded+other);
+
+  const N=newRegimeTax(nTaxable),O=oldRegimeTax(oTaxable);
+
+  const set=(id,v)=>document.getElementById(id).textContent=v;
+  set('oGross',fmt(salary+other)); set('nGross',fmt(salary+other));
+  set('oStd','− '+fmt(50000)); set('nStd','− '+fmt(75000));
+  set('oHra',hra?'− '+fmt(hra):'—');
+  set('oDed',ded?'− '+fmt(ded):'—');
+  set('oTaxable',fmt(oTaxable)); set('nTaxable',fmt(nTaxable));
+  set('oTax',fmt(O.tax)); set('nTax',fmt(N.tax));
+  set('oSur',O.sur?fmt(O.sur):'—'); set('nSur',N.sur?fmt(N.sur):'—');
+  set('oCess',fmt(O.cess)); set('nCess',fmt(N.cess));
+  rollMoney('oTotal',O.total); rollMoney('nTotal',N.total);
+
+  /* regime summary cards */
+  set('rcNTaxable',fmt(nTaxable)); set('rcOTaxable',fmt(oTaxable));
+  set('rcNTax',fmt(N.total)); set('rcOTax',fmt(O.total));
+  set('rcODed',(hra+ded)?'− '+fmt(hra+ded):'—');
+  rollMoney('rcNTake',Math.max(0,(salary-N.total)/12));
+  rollMoney('rcOTake',Math.max(0,(salary-O.total)/12));
+  document.getElementById('cardNew').classList.toggle('winner-card',N.total<O.total);
+  document.getElementById('cardOld').classList.toggle('winner-card',O.total<N.total);
+  document.getElementById('regimeCards').hidden=false;
+  document.getElementById('takeNote').hidden=false;
+  document.getElementById('fullTableWrap').hidden=false;
+  document.getElementById('surNote').hidden=(salary+other)<=5e6;
+
+  document.getElementById('oTotal').classList.toggle('winner',O.total<N.total);
+  document.getElementById('nTotal').classList.toggle('winner',N.total<O.total);
+
+  const diff=Math.abs(N.total-O.total);
+  const stamp=document.getElementById('stamp');
+  let winner;
+  if(diff<1){winner='tie';stampSet('Hung jury','Both cost '+fmt(N.total),'Flip a coin. A taxable coin.',true);}
+  else if(N.total<O.total){winner='new';stampSet('Verdict · new regime','Save '+fmt(diff)+' vs old',pick(QUIP_NEW),false);}
+  else {winner='old';stampSet('Verdict · old regime','Save '+fmt(diff)+' vs new',pick(QUIP_OLD),false);}
+  if(winner!==lastWinner){
+    stamp.classList.remove('slam');void stamp.offsetWidth;stamp.classList.add('slam');
+    document.body.classList.remove('thud');void document.body.offsetWidth;document.body.classList.add('thud');
+    lastWinner=winner;
+  }
+
+  const be=document.getElementById('breakeven');
+  if(N.total<O.total){
+    let lo=0,hi=oTaxable;
+    for(let i=0;i<40;i++){const mid=(lo+hi)/2;
+      (oldRegimeTax(Math.max(0,oTaxable-mid)).total>N.total)?lo=mid:hi=mid;}
+    be.innerHTML='For the old regime to merely tie, you\u2019d need roughly <b>'+fmt(hi)+'</b> of <em>additional</em> deductions beyond what you entered. If you don\u2019t have that lying around (you don\u2019t), the debate is over.';
+    be.hidden=false;
+  } else if(O.total<N.total){
+    be.innerHTML='Old regime wins — answer <b>"Yes"</b> to opting out of 115BAC on the portal, and guard those proofs like wedding gold.';
+    be.hidden=false;
+  } else be.hidden=true;
+
+  const tl=document.getElementById('tdsLine');
+  const knownTDS=val('tds');
+  if(knownTDS>0){
+    const win=Math.min(N.total,O.total);
+    const gap=Math.round(win-knownTDS);
+    tl.innerHTML = gap>0
+      ? 'TDS already deducted: <b>'+fmt(knownTDS)+'</b> → estimated <b style="color:var(--danger)">'+fmt(gap)+' payable</b>. The department misses you.'
+      : 'TDS already deducted: <b>'+fmt(knownTDS)+'</b> → estimated <b style="color:var(--good)">'+fmt(-gap)+' refund</b>. Biryani\u2019s on you.';
+    tl.hidden=false;
+    if(gap<0 && !refundCelebrated){refundCelebrated=true;confettiBurst();}
+    if(gap>=0)refundCelebrated=false;
+  } else tl.hidden=true;
+}
+function stampSet(l1,l2,l3,tie){
+  const s=document.getElementById('stamp');
+  s.classList.toggle('tie',tie);
+  s.querySelector('.verdict-line1').textContent=l1;
+  s.querySelector('.verdict-line2').textContent=l2;
+  s.querySelector('.verdict-line3').textContent=l3;
+}
+function resetVerdict(){
+  stampSet('Court is in session','Enter your salary to begin','The stamp is warming up.',true);
+  document.getElementById('regimeCards').hidden=true;
+  document.getElementById('takeNote').hidden=true;
+  document.getElementById('fullTableWrap').hidden=true;
+  document.getElementById('breakeven').hidden=true;
+  document.getElementById('tdsLine').hidden=true;
+  document.getElementById('surNote').hidden=true;
+  document.getElementById('hraResult').hidden=true;
+  lastWinner=null;
+}
+/* annual ↔ monthly salary sync */
+const sA=document.getElementById('salary'),sM=document.getElementById('salaryM');
+sA.addEventListener('input',()=>{sM.value=sA.value?Math.round(val('salary')/12):'';});
+sM.addEventListener('input',()=>{sA.value=sM.value?Math.round(val('salaryM')*12):'';});
+form.addEventListener('input',compute);
+
+/* ---------- 3D tilt on results card ---------- */
+const rc=document.getElementById('resultsCard');
+if(!reduceMotion&&matchMedia('(pointer:fine)').matches){
+  rc.addEventListener('mousemove',e=>{
+    const r=rc.getBoundingClientRect();
+    const x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+    rc.style.transform='perspective(900px) rotateY('+(x*4)+'deg) rotateX('+(-y*3)+'deg)';
+  });
+  rc.addEventListener('mouseleave',()=>rc.style.transform='');
+}
+
+/* ---------- confetti (refund celebration) ---------- */
+function confettiBurst(){
+  if(reduceMotion)return;
+  const cv=document.getElementById('confetti'),ctx=cv.getContext('2d');
+  cv.width=innerWidth;cv.height=innerHeight;
+  const colors=['#6F2754','#1E6B4F','#B97316','#1B3A2F'];
+  const parts=Array.from({length:90},()=>({
+    x:innerWidth/2+(Math.random()-.5)*220, y:innerHeight*.35,
+    vx:(Math.random()-.5)*9, vy:-(4+Math.random()*7),
+    s:4+Math.random()*5, r:Math.random()*Math.PI, vr:(Math.random()-.5)*.3,
+    c:colors[Math.random()*colors.length|0], life:1
+  }));
+  const t0=performance.now();
+  (function frame(now){
+    const t=(now-t0)/1000;
+    ctx.clearRect(0,0,cv.width,cv.height);
+    let alive=false;
+    for(const p of parts){
+      p.x+=p.vx; p.y+=p.vy; p.vy+=.22; p.r+=p.vr; p.life=Math.max(0,1-t/1.8);
+      if(p.life>0&&p.y<cv.height+20)alive=true;
+      ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.globalAlpha=p.life;
+      ctx.fillStyle=p.c;ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);ctx.restore();
+    }
+    if(alive)requestAnimationFrame(frame);else ctx.clearRect(0,0,cv.width,cv.height);
+  })(t0);
+}
+
+/* ---------- three.js ambient: drifting rupee coins ---------- */
+function init3D(){
+  if(reduceMotion||!window.THREE)return;
+  const mount=document.getElementById('bg3d');
+  const W=()=>mount.clientWidth,H=()=>mount.clientHeight;
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(42,W()/H(),.1,100);cam.position.z=14;
+  const ren=new THREE.WebGLRenderer({alpha:true,antialias:true});
+  ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.setSize(W(),H());
+  mount.appendChild(ren.domElement);
+  function coinTexture(){
+    const c=document.createElement('canvas');c.width=c.height=128;
+    const x=c.getContext('2d');
+    x.fillStyle='#7c3b63';x.beginPath();x.arc(64,64,62,0,7);x.fill();
+    x.strokeStyle='#f3e6ee';x.lineWidth=5;x.beginPath();x.arc(64,64,52,0,7);x.stroke();
+    x.fillStyle='#f3e6ee';x.font='700 64px Georgia';x.textAlign='center';x.textBaseline='middle';
+    x.fillText('₹',64,68);
+    return new THREE.CanvasTexture(c);
+  }
+  const tex=coinTexture();
+  const edgeMat=new THREE.MeshStandardMaterial({color:0x6F2754,metalness:.45,roughness:.5});
+  const faceMat=new THREE.MeshStandardMaterial({map:tex,metalness:.35,roughness:.55});
+  const geo=new THREE.CylinderGeometry(1,1,.16,40);
+  const coins=[];
+  const count=matchMedia('(max-width:640px)').matches?7:12;
+  for(let i=0;i<count;i++){
+    const m=new THREE.Mesh(geo,[edgeMat,faceMat,faceMat]);
+    const s=.45+Math.random()*.85;m.scale.setScalar(s);
+    m.position.set((Math.random()-.5)*22,(Math.random()-.5)*5,-2-Math.random()*6);
+    m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6);
+    m.userData={vy:.0015+Math.random()*.003,vr:.004+Math.random()*.01,ph:Math.random()*6};
+    scene.add(m);coins.push(m);
+  }
+  scene.add(new THREE.AmbientLight(0xffffff,.85));
+  const key=new THREE.DirectionalLight(0xfff4e0,.7);key.position.set(4,6,8);scene.add(key);
+  let mx=0,my=0;
+  addEventListener('mousemove',e=>{mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5;},{passive:true});
+  let visible=true;
+  new IntersectionObserver(en=>visible=en[0].isIntersecting).observe(mount);
+  (function loop(t){
+    requestAnimationFrame(loop);
+    if(!visible)return;
+    for(const c of coins){
+      c.rotation.x+=c.userData.vr;c.rotation.y+=c.userData.vr*.7;
+      c.position.y+=Math.sin(t*.0006+c.userData.ph)*c.userData.vy;
+    }
+    cam.position.x+=(mx*1.6-cam.position.x)*.04;
+    cam.position.y+=(-my*.9-cam.position.y)*.04;
+    cam.lookAt(0,0,-4);
+    ren.render(scene,cam);
+  })(0);
+  addEventListener('resize',()=>{cam.aspect=W()/H();cam.updateProjectionMatrix();ren.setSize(W(),H());},{passive:true});
+}
+addEventListener('load',init3D);
+
+/* ---------- checklist ---------- */
+const DONE_LINES=['hunted down','captured','secured','in the bag','victorious'];
+const list=document.getElementById('checkList');
+list.addEventListener('change',()=>{
+  let done=0,total=0;
+  list.querySelectorAll('.check-item').forEach(item=>{
+    const c=item.querySelector('input');total++;if(c.checked)done++;
+    item.classList.toggle('done',c.checked);
+  });
+  const word=done===total?'— full house! Now go file.':DONE_LINES[Math.min(done,DONE_LINES.length-1)];
+  document.getElementById('progress').innerHTML='<b>'+done+'</b> of '+total+' '+(done===total?word:word);
+});
+
+/* ---------- quiz ---------- */
+const QUIZ=[
+ 'Total income above ₹50 lakh? (nice)',
+ 'Sold shares, mutual funds, or property this FY (any STCG, or LTCG on equity above ₹1.25L)?',
+ 'Own more than two house properties? (again — nice)',
+ 'Hold any unlisted shares (startup equity, that friend\u2019s "next unicorn")?',
+ 'Director in any company?',
+ 'Foreign assets or income — including RSUs/ESPP of a foreign parent company?',
+ 'Non-resident or RNOR for the year?',
+ 'Agricultural income above ₹5,000?',
+ 'Brought-forward losses to carry or set off?'
+];
+const qWrap=document.getElementById('quizList');
+const answers=new Array(QUIZ.length).fill(false);
+QUIZ.forEach((q,i)=>{
+  const row=document.createElement('div');row.className='quiz-q';
+  row.innerHTML='<span class="q">'+q+'</span><span class="toggle" role="group" aria-label="'+q.replace(/"/g,'&quot;')+'">'+
+    '<button type="button" data-i="'+i+'" data-v="0" class="on">No</button>'+
+    '<button type="button" data-i="'+i+'" data-v="1">Yes</button></span>';
+  qWrap.appendChild(row);
+});
+qWrap.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const i=+b.dataset.i,yes=b.dataset.v==='1';
+  answers[i]=yes;
+  const [no,y]=b.parentElement.querySelectorAll('button');
+  no.classList.toggle('on',!yes);y.classList.toggle('on',yes);y.classList.toggle('yes',yes);
+  const any=answers.some(Boolean);
+  const v=document.getElementById('quizVerdict');
+  v.classList.toggle('itr2',any);
+  v.innerHTML=any
+    ?'<b>ITR-2</b> — congratulations, your finances have a plot now. ITR-2 handles capital gains, multiple properties, foreign assets (Schedule FA) and director/unlisted-share disclosures. Foreign assets involved? That\u2019s CA territory — this is not the year for improvisation.'
+    :'<b>ITR-1 (Sahaj)</b> — "Sahaj" literally means easy, and for once the naming is accurate. File it online with pre-filled data.';
+});
+})();
+</script>
+</body>
+</html>
